@@ -1,0 +1,10 @@
+{
+    "name": "mullet cms interface",
+    "version": "0.0.0",
+    "description": "",
+    "main": "main.js",
+    "dependencies": {
+        "rsvp": "",
+        "underscore": ""
+    }
+}
