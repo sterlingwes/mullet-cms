@@ -8,7 +8,7 @@ module.exports = function(db, jade, tasker) {
      */
     function CMS() {
         
-        this.pages = {};
+        this.pagelist = {};
         this.chain = '';
         
     }
@@ -19,13 +19,16 @@ module.exports = function(db, jade, tasker) {
      * - name, string (optional) identifying page configuration (defaults to 'default')
      * - config, object with:
      *      - uri: the path template to match db record fields, defines folder structure
-     *      - collection: the db Schema object you wish to search or any array of records
+     *      - collection: the db Schema object you wish to search or any array of records or a string referring to a schema object
      *      - search: the object to pass to find(), defaults to {} (all records)
      *      - template: jade template or a Renderer object
+     * - cb, function callback
      */
-    CMS.prototype.pages = function(name, cfg) {
+    CMS.prototype.pages = function(name, cfg, cb) {
         
         if(typeof name !== 'string') {
+            if(typeof cfg === 'function')
+                cb = cfg;
             cfg = name;
             name = 'default';
         }
@@ -33,24 +36,28 @@ module.exports = function(db, jade, tasker) {
         if(typeof cfg !== 'object')
             return console.error('  ! CMS.pages(), no cfg object provided.');
         
-        this.pages = this.pages[name] || {};
+        if(!this.pagelist[name])    this.pagelist[name] = {};
         
-        _.extend(this.pages[name], cfg);
+        _.extend(this.pagelist[name], cfg);
+        
+        if(typeof cfg.collection === 'string') {
+            cfg.collection = db.schema(cfg.collection);
+        }
         
         if(_.isArray(cfg.collection))
-            this._renderPages(name, cfg.collection);
+            this._renderPages(name, cfg.collection).then(cb);
         else
             this._getRecords(cfg.collection, cfg.search || {})
+            
                 .then(function(recs) {
                     return this._renderPages(name, recs);
-                    
                 }.bind(this))
+            
+                .then(cb)
+                
                 .catch(function(err) {
                     console.error('  ! CMS.pages() error', err);
                 });
-        
-        
-        
     };
     
     /*
@@ -64,7 +71,6 @@ module.exports = function(db, jade, tasker) {
     CMS.prototype._getRecords = function(schema, search) {
         
         return new RSVP.Promise(function(resolve, reject) {
-            
             schema.find(search, function(err, recs) {
                 if(err) reject(err);
                 else    resolve(recs);
@@ -80,7 +86,7 @@ module.exports = function(db, jade, tasker) {
      */
     CMS.prototype._getPageUri = function(name, rec) {
         
-        var cfg = this.pages[name];
+        var cfg = this.pagelist[name];
         if(!cfg || !cfg.uri || !rec)
             return console.warn('  ! CMS could not build page URI for ' + name);
         
@@ -88,11 +94,16 @@ module.exports = function(db, jade, tasker) {
           , uriParts = [];
         
         _.each(parts, function(part) {
-            if(rec[part] && typeof rec[part] === 'string')
-                uriParts.push(rec[part]);
+            var uriPart = '';
+            if(part.indexOf(':')==0 && rec[part.substr(1)] && typeof rec[part.substr(1)] === 'string')
+                uriPart = rec[part.substr(1)];
+            else if(typeof part === 'string')
+                uriPart = part;
+            
+            uriParts.push( encodeURIComponent(uriPart.replace(/\s+/g,'-').toLowerCase()) );
         });
         
-        return uriParts.join('/');
+        return uriParts.join('/')+'.html';
     };
     
     /*
@@ -105,7 +116,7 @@ module.exports = function(db, jade, tasker) {
      */
     CMS.prototype._renderPages = function(cfgName, recs) {
         
-        var cfg = this.pages[cfgName]
+        var cfg = this.pagelist[cfgName]
           , promises = [];
         
         _.each(recs, function(rec) {
