@@ -6,12 +6,16 @@ module.exports = function(db, jade, tasker) {
     /*
      * CMS - interface for structuring content & rendering
      */
-    function CMS() {
+    function CMS(app) {
+        
+        tasker = tasker(app); // override app 'owner' so that destpaths refer to the 'owner' of this app
         
         this.pagelist = {};
         this.chain = '';
         
     }
+    
+    CMS.prototype.Schemas = require('./schemas')(db);
     
     /*
      * CMS.pages() - configures page rendering and URI scheme
@@ -100,7 +104,10 @@ module.exports = function(db, jade, tasker) {
             else if(typeof part === 'string')
                 uriPart = part;
             
-            uriParts.push( encodeURIComponent(uriPart.replace(/\s+/g,'-').toLowerCase()) );
+            uriPart = uriPart.replace(/\s+/g,'-').toLowerCase();
+            
+            if(uriPart && uriPart.indexOf(':')!==0)
+                uriParts.push( encodeURIComponent() );
         });
         
         return uriParts.join('/')+'.html';
@@ -121,6 +128,9 @@ module.exports = function(db, jade, tasker) {
         
         _.each(recs, function(rec) {
             
+            if('get' in rec && typeof rec.get === 'function')
+                rec = rec.get();
+            
             var tpl;
             if(typeof cfg.template === 'string') {
                 // just have a jade template, render from rec data
@@ -139,7 +149,7 @@ module.exports = function(db, jade, tasker) {
             
         }.bind(this));
         
-        return RSVP.all(promises);
+        return RSVP.all(promises).then(function(pathsRendered) { return _.flatten(pathsRendered); });
     };
     
     
