@@ -99,7 +99,7 @@ module.exports = function(db, jade, tasker) {
         
         _.each(parts, function(part) {
             var uriPart = '';
-            if(part.indexOf(':')==0 && rec[part.substr(1)] && typeof rec[part.substr(1)] === 'string')
+            if(part.indexOf(':')===0 && rec[part.substr(1)] && typeof rec[part.substr(1)] === 'string')
                 uriPart = rec[part.substr(1)];
             else if(typeof part === 'string')
                 uriPart = part;
@@ -107,7 +107,7 @@ module.exports = function(db, jade, tasker) {
             uriPart = uriPart.replace(/\s+/g,'-').toLowerCase();
             
             if(uriPart && uriPart.indexOf(':')!==0)
-                uriParts.push( encodeURIComponent() );
+                uriParts.push( encodeURIComponent(uriPart) );
         });
         
         return uriParts.join('/')+'.html';
